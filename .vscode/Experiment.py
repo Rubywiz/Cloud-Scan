@@ -1,8 +1,12 @@
+#!/usr/bin/env python3
+
 import boto3
 import logging
 import pandas as pd
-import os
 import json
+import socket
+import threading
+import nmap
 from sklearn.ensemble import IsolationForest
 from sklearn.preprocessing import LabelEncoder
 from typing import List, Dict, Any
@@ -23,6 +27,105 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
+
+class Honeypot:
+    def __init__(self, host: str = "0.0.0.0", port: int = 8080):
+        """
+        Initialize a TCP honeypot.
+
+        Args:
+            host: IP address to bind the honeypot (default: 0.0.0.0).
+            port: Port to listen on (default: 8080).
+        """
+        self.host = host
+        self.port = port
+        self.log_file = "honeypot.log"
+
+    def start(self):
+        """
+        Start the honeypot and log incoming connections.
+        """
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
+                server_socket.bind((self.host, self.port))
+                server_socket.listen(5)
+                logger.info(f"Honeypot started on {self.host}:{self.port}")
+
+                while True:
+                    client_socket, client_address = server_socket.accept()
+                    logger.info(f"Connection from {client_address}")
+                    with open(self.log_file, "a") as f:
+                        f.write(f"Connection from {client_address}\n")
+                    client_socket.close()
+        except Exception as e:
+            logger.error(f"Error in honeypot: {e}")
+            raise
+
+def start_honeypot():
+    """
+    Start the honeypot in a separate thread.
+    """
+    honeypot = Honeypot()
+    honeypot_thread = threading.Thread(target=honeypot.start)
+    honeypot_thread.daemon = True  # Daemonize thread to exit when the main program exits
+    honeypot_thread.start()
+
+def scan_network(target: str) -> dict:
+    """
+    Scan a target IP or network using Nmap.
+
+    Args:
+        target: IP address or network range to scan (e.g., "192.168.0.1" or "192.168.0.0/24").
+
+    Returns:
+        Dictionary containing scan results.
+    """
+    try:
+        nm = nmap.PortScanner()
+        nm.scan(hosts=target, arguments="-sV")  # -sV: Version detection
+        scan_results = nm.analyse_nmap_xml_scan()  # Parse scan results
+        return scan_results
+    except Exception as e:
+        logger.error(f"Error scanning network: {e}")
+        raise
+
+def detect_intrusions(scan_results: dict) -> List[str]:
+    """
+    Analyze scan results to detect potential intrusions.
+
+    Args:
+        scan_results: Dictionary containing Nmap scan results.
+
+    Returns:
+        List of intrusion findings.
+    """
+    findings = []
+
+    for host in scan_results["scan"]:
+        for port, port_data in scan_results["scan"][host]["tcp"].items():
+            if port_data["state"] == "open":
+                finding = f"Open port detected: {host}:{port} ({port_data['name']})"
+                findings.append(finding)
+                logger.info(finding)
+
+    return findings
+
+def save_findings(findings: List[str], file: str = "findings.txt") -> None:
+    """
+    Save intrusion findings to a file.
+
+    Args:
+        findings: List of intrusion findings.
+        file: Path to the output file (default: findings.txt).
+    """
+    try:
+        with open(file, "w") as f:
+            for finding in findings:
+                f.write(f"{finding}\n")
+        logger.info(f"Findings saved to {file}")
+    except Exception as e:
+        logger.error(f"Error saving findings: {e}")
+        raise
 
 class AWSIntrusionDetection:
     def __init__(self, aws_access_key_id: str, aws_secret_access_key: str, region: str = "us-east-1"):
@@ -111,13 +214,16 @@ class AWSIntrusionDetection:
             logger.error(f"Error invoking Lambda: {e}")
             raise
 
-    def send_logs_to_kinesis(self, file: str, stream_name: str) -> None:
+    def send_logs_to_kinesis(self, file: str, stream_name: str) -> List[Dict[str, Any]]:
         """
-        Stream logs to AWS Kinesis in batches.
+        Stream logs to AWS Kinesis in batches and return the logs for anomaly detection.
 
         Args:
             file: Path to the log file.
             stream_name: Name of the Kinesis stream.
+
+        Returns:
+            List of log entries.
         """
         try:
             # Check if the file exists
@@ -125,14 +231,18 @@ class AWSIntrusionDetection:
                 raise FileNotFoundError(f"Log file not found: {file}")
 
             with open(file, "r") as f:
-                logs = [{"Data": json.dumps({"log": log.strip()}), "PartitionKey": "log"} for log in f]
+                logs = [json.loads(log.strip()) for log in f]  # Parse each line as JSON
 
+            # Send logs to Kinesis
             for i in range(0, len(logs), KINESIS_BATCH_SIZE):
+                records = [{"Data": json.dumps(log), "PartitionKey": "log"} for log in logs[i : i + KINESIS_BATCH_SIZE]]
                 self.services["kinesis"].put_records(
                     StreamName=stream_name,
-                    Records=logs[i : i + KINESIS_BATCH_SIZE],
+                    Records=records
                 )
             logger.info(f"Logs sent to Kinesis stream: {stream_name}")
+
+            return logs  # Return the logs for anomaly detection
         except FileNotFoundError as e:
             logger.error(f"Error: {e}")
             raise
@@ -159,27 +269,29 @@ class AWSIntrusionDetection:
             # Create the Kinesis stream if it doesn't exist
             self.create_kinesis_stream(LOG_STREAM_NAME)
 
-            # Example logs (replace with real log data)
-            logs = [
-                {"src_ip": "192.168.0.1", "dest_ip": "192.168.0.2", "protocol": "TCP", "bytes_sent": 1000, "packet_count": 50}
-            ]
+            # Send logs to Kinesis and get the logs for anomaly detection
+            logs = self.send_logs_to_kinesis(log_file, LOG_STREAM_NAME)
+
+            # Detect anomalies
             anomalies = self.detect_anomalies(logs)
 
             # Log findings to terminal and file
-            for index, row in logs.iterrows():
+            for index, log in enumerate(logs):
                 if anomalies[index] == -1:
-                    finding = f"Anomaly detected: {row}"
+                    finding = f"Anomaly detected: {log}"
                     logger.info(finding)  # Log to terminal and file
 
             if (anomalies == -1).sum() > 0:
                 self.alert_lambda("Potential security threat detected!")
 
-            self.send_logs_to_kinesis(log_file, LOG_STREAM_NAME)
         except Exception as e:
             logger.error(f"Error running security pipeline: {e}")
             raise
 
 if __name__ == "__main__":
+    # Start the honeypot
+    start_honeypot()
+
     # Request user input for AWS credentials
     aws_access_key_id = input("Enter AWS Access Key ID: ")
     aws_secret_access_key = input("Enter AWS Secret Access Key: ")
@@ -197,3 +309,9 @@ if __name__ == "__main__":
     # Initialize and run the system
     system = AWSIntrusionDetection(aws_access_key_id, aws_secret_access_key)
     system.run(detector_id, web_acl_id, "logfile.txt")
+
+    # Scan the network and detect intrusions
+    target = input("Enter the target IP or network range to scan (e.g., 192.168.0.1 or 192.168.0.0/24): ")
+    scan_results = scan_network(target)
+    findings = detect_intrusions(scan_results)
+    save_findings(findings)

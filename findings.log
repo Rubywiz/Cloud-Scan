@@ -1,4 +1,58 @@
-2025-03-12 13:38:21,400 - INFO - Kinesis stream already exists: log_stream
+s2025-03-12 13:38:21,400 - INFO - Kinesis stream already exists: log_stream
 2025-03-12 13:38:21,700 - ERROR - Error running security pipeline: 'list' object has no attribute 'iterrows'
 2025-03-12 14:03:57,758 - INFO - Kinesis stream already exists: log_stream
 2025-03-12 14:03:58,328 - INFO - Logs sent to Kinesis stream: log_stream
+2025-03-13 10:48:44,555 - INFO - Honeypot started on 0.0.0.0:8080
+2025-03-13 14:18:37,100 - INFO - Honeypot started on 0.0.0.0:8080
+2025-03-13 14:24:48,481 - INFO - Kinesis stream already exists: log_stream
+2025-03-13 14:24:48,813 - INFO - Logs sent to Kinesis stream: log_stream
+2025-03-13 14:35:10,369 - INFO - Honeypot started on 0.0.0.0:8080
+2025-03-13 14:36:08,425 - INFO - Kinesis stream already exists: log_stream
+2025-03-13 14:36:08,716 - INFO - Logs sent to Kinesis stream: log_stream
+2025-03-13 14:36:09,007 - ERROR - Error scanning network: 'nmap program was not found in path. PATH is : C:\\Program Files (x86)\\VMware\\VMware Workstation\\bin\\;C:\\Windows\\system32;C:\\Windows;C:\\Windows\\System32\\Wbem;C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\;C:\\Windows\\System32\\OpenSSH\\;C:\\Program Files\\Git\\cmd;C:\\Users\\Administrator\\AppData\\Local\\Microsoft\\WindowsApps;C:\\Users\\Administrator\\AppData\\Local\\Programs\\Microsoft VS Code\\bin;c:\\Users\\Administrator\\.vscode\\extensions\\ms-python.debugpy-2025.4.1-win32-x64\\bundled\\scripts\\noConfigScripts;c:\\Users\\Administrator\\AppData\\Roaming\\Code\\User\\globalStorage\\github.copilot-chat\\debugCommand'
+2025-03-13 14:49:10,488 - INFO - Honeypot started on 0.0.0.0:8080
+2025-03-13 14:50:46,089 - INFO - Kinesis stream already exists: log_stream
+2025-03-13 14:50:46,422 - INFO - Logs sent to Kinesis stream: log_stream
+2025-03-13 14:50:46,749 - ERROR - Error scanning network: 'nmap program was not found in path. PATH is : C:\\Program Files (x86)\\VMware\\VMware Workstation\\bin\\;C:\\Windows\\system32;C:\\Windows;C:\\Windows\\System32\\Wbem;C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\;C:\\Windows\\System32\\OpenSSH\\;C:\\Program Files\\Git\\cmd;C:\\Users\\Administrator\\AppData\\Local\\Microsoft\\WindowsApps;C:\\Users\\Administrator\\AppData\\Local\\Programs\\Microsoft VS Code\\bin;c:\\Users\\Administrator\\.vscode\\extensions\\ms-python.debugpy-2025.4.1-win32-x64\\bundled\\scripts\\noConfigScripts;c:\\Users\\Administrator\\AppData\\Roaming\\Code\\User\\globalStorage\\github.copilot-chat\\debugCommand'
+2025-03-13 15:06:56,468 - INFO - Honeypot started on 0.0.0.0:8080
+2025-03-13 15:09:44,242 - INFO - Kinesis stream already exists: log_stream
+2025-03-13 15:09:44,667 - INFO - Logs sent to Kinesis stream: log_stream
+2025-03-13 15:11:23,184 - ERROR - Error scanning network: 'nmap program was not found in path. PATH is : C:\\Program Files (x86)\\VMware\\VMware Workstation\\bin\\;C:\\Windows\\system32;C:\\Windows;C:\\Windows\\System32\\Wbem;C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\;C:\\Windows\\System32\\OpenSSH\\;C:\\Program Files\\Git\\cmd;C:\\Users\\Administrator\\AppData\\Local\\Microsoft\\WindowsApps;C:\\Users\\Administrator\\AppData\\Local\\Programs\\Microsoft VS Code\\bin;c:\\Users\\Administrator\\.vscode\\extensions\\ms-python.debugpy-2025.4.1-win32-x64\\bundled\\scripts\\noConfigScripts;c:\\Users\\Administrator\\AppData\\Roaming\\Code\\User\\globalStorage\\github.copilot-chat\\debugCommand'
+2025-03-13 15:20:28,173 - INFO - Honeypot started on 0.0.0.0:8080
+2025-03-13 15:21:15,428 - INFO - Kinesis stream already exists: log_stream
+2025-03-13 15:21:15,703 - INFO - Logs sent to Kinesis stream: log_stream
+2025-03-13 15:21:34,274 - ERROR - Error scanning network: 'nmap program was not found in path. PATH is : C:\\Program Files (x86)\\VMware\\VMware Workstation\\bin\\;C:\\Windows\\system32;C:\\Windows;C:\\Windows\\System32\\Wbem;C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\;C:\\Windows\\System32\\OpenSSH\\;C:\\Program Files\\Git\\cmd;C:\\Users\\Administrator\\AppData\\Local\\Microsoft\\WindowsApps;C:\\Users\\Administrator\\AppData\\Local\\Programs\\Microsoft VS Code\\bin;c:\\Users\\Administrator\\.vscode\\extensions\\ms-python.debugpy-2025.4.1-win32-x64\\bundled\\scripts\\noConfigScripts;c:\\Users\\Administrator\\AppData\\Roaming\\Code\\User\\globalStorage\\github.copilot-chat\\debugCommand'
+2025-03-13 15:26:58,551 - INFO - Honeypot started on 0.0.0.0:8080
+2025-03-13 15:28:18,757 - INFO - Kinesis stream already exists: log_stream
+2025-03-13 15:28:19,043 - INFO - Logs sent to Kinesis stream: log_stream
+2025-03-13 15:31:28,196 - INFO - Open port detected: 168.167.228.94:22 (tcpwrapped)
+2025-03-13 15:31:28,196 - INFO - Open port detected: 168.167.228.94:25 (smtp-proxy)
+2025-03-13 15:31:28,196 - INFO - Open port detected: 168.167.228.94:80 (http)
+2025-03-13 15:31:28,196 - INFO - Open port detected: 168.167.228.94:443 (http)
+2025-03-13 15:31:28,196 - INFO - Open port detected: 168.167.228.94:445 (microsoft-ds)
+2025-03-13 15:31:28,196 - INFO - Open port detected: 168.167.228.94:2000 (cisco-sccp)
+2025-03-13 15:31:28,196 - INFO - Open port detected: 168.167.228.94:5060 (sip)
+2025-03-13 15:31:28,196 - INFO - Open port detected: 168.167.228.94:8008 (http-proxy)
+2025-03-13 15:31:28,196 - INFO - Open port detected: 168.167.228.94:8010 (http-proxy)
+2025-03-13 15:31:28,196 - INFO - Findings saved to findings.txt
+2025-03-13 15:37:03,952 - INFO - Honeypot started on 0.0.0.0:8080
+2025-03-13 15:48:42,091 - INFO - Kinesis stream already exists: log_stream
+2025-03-13 15:48:42,376 - INFO - Logs sent to Kinesis stream: log_stream
+2025-03-13 15:48:42,916 - INFO - Findings saved to findings.txt
+2025-03-14 12:57:42,868 - INFO - Honeypot started on 0.0.0.0:8080
+2025-03-14 13:01:56,442 - ERROR - Error creating Kinesis stream: An error occurred (IncompleteSignatureException) when calling the ListStreams operation: Invalid key=value pair (missing equal-sign) in Authorization header (hashed with SHA-256 and encoded with Base64): 'duyaDH/HSsNvNAb8/zO3yAbkCEP7/tQbZrDQrD8vOJ8='.
+2025-03-14 13:01:56,442 - ERROR - Error running security pipeline: An error occurred (IncompleteSignatureException) when calling the ListStreams operation: Invalid key=value pair (missing equal-sign) in Authorization header (hashed with SHA-256 and encoded with Base64): 'duyaDH/HSsNvNAb8/zO3yAbkCEP7/tQbZrDQrD8vOJ8='.
+2025-03-14 13:03:11,784 - INFO - Honeypot started on 0.0.0.0:8080
+2025-03-14 13:04:28,062 - INFO - Kinesis stream already exists: log_stream
+2025-03-14 13:04:28,359 - INFO - Logs sent to Kinesis stream: log_stream
+2025-03-14 13:06:25,610 - INFO - Findings saved to findings.txt
+2025-03-14 13:29:30,494 - INFO - Honeypot started on 0.0.0.0:8080
+2025-03-14 13:30:45,651 - INFO - Kinesis stream already exists: log_stream
+2025-03-14 13:30:45,946 - INFO - Logs sent to Kinesis stream: log_stream
+2025-03-14 13:31:23,109 - INFO - Findings saved to findings.txt
+2025-03-14 14:05:12,827 - INFO - Honeypot started on 0.0.0.0:8080
+2025-03-14 14:08:05,102 - INFO - Kinesis stream already exists: log_stream
+2025-03-14 14:08:05,476 - INFO - Logs sent to Kinesis stream: log_stream
+2025-03-14 14:08:06,182 - INFO - Findings saved to findings.txt
+2025-03-14 14:41:42,794 - INFO - Honeypot started on 0.0.0.0:8080
+2025-03-14 14:42:21,838 - INFO - Honeypot started on 0.0.0.0:8080
