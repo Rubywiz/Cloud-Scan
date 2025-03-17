@@ -1,0 +1,2 @@
+{"src_ip": "192.168.0.1", "dest_ip": "192.168.0.2", "protocol": "TCP", "bytes_sent": 1000, "packet_count": 50}
+{"src_ip": "192.168.0.3", "dest_ip": "192.168.0.4", "protocol": "UDP", "bytes_sent": 500, "packet_count": 25}

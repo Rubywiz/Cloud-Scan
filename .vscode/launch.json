@@ -1,0 +1,18 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        
+
+        {
+            "name": "Python: Current File",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "env": {
+                "GUARDDUTY_DETECTOR_ID": "2acac4c12e8dd23051fe9cb0c849df24",
+                "WAF_ACL_ID": "c428eaf8-f91b-4571-bf37-5baa047d3676"
+            }
+        }
+    ]
+}

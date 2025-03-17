@@ -1,0 +1,4 @@
+2025-03-12 13:38:21,400 - INFO - Kinesis stream already exists: log_stream
+2025-03-12 13:38:21,700 - ERROR - Error running security pipeline: 'list' object has no attribute 'iterrows'
+2025-03-12 14:03:57,758 - INFO - Kinesis stream already exists: log_stream
+2025-03-12 14:03:58,328 - INFO - Logs sent to Kinesis stream: log_stream
