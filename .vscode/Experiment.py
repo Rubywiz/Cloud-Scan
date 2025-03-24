@@ -7,311 +7,215 @@ import json
 import socket
 import threading
 import nmap
+import os
+import argparse
 from sklearn.ensemble import IsolationForest
 from sklearn.preprocessing import LabelEncoder
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
+from datetime import datetime
 
 # Constants
 KINESIS_BATCH_SIZE = 500
 LOG_STREAM_NAME = "log_stream"
 LAMBDA_FUNCTION_NAME = "TriggerLambdaFunction"
-LOG_FILE = "findings.log"  # File to store findings
+LOG_FILE = "findings.log"
+DEFAULT_HONEYPOT_PORT = 8088  # Changed from 8080 to less common port
+MAX_LOG_SIZE = 10 * 1024 * 1024  # 10MB max log size
+LOG_BACKUP_COUNT = 3
 
-# Configure logging
+# Configure logging with rotation
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
     handlers=[
-        logging.FileHandler(LOG_FILE),  # Write logs to a file
-        logging.StreamHandler()         # Print logs to the terminal
+        logging.handlers.RotatingFileHandler(
+            LOG_FILE, maxBytes=MAX_LOG_SIZE, backupCount=LOG_BACKUP_COUNT
+        ),
+        logging.StreamHandler()
     ]
 )
 logger = logging.getLogger(__name__)
 
 class Honeypot:
-    def __init__(self, host: str = "0.0.0.0", port: int = 8080):
-        """
-        Initialize a TCP honeypot.
-
-        Args:
-            host: IP address to bind the honeypot (default: 0.0.0.0).
-            port: Port to listen on (default: 8080).
-        """
+    def __init__(self, host: str = "0.0.0.0", port: int = DEFAULT_HONEYPOT_PORT):
         self.host = host
         self.port = port
         self.log_file = "honeypot.log"
+        self.running = False
 
     def start(self):
-        """
-        Start the honeypot and log incoming connections.
-        """
+        """Start the honeypot with proper error handling and timeouts."""
+        self.running = True
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
+                server_socket.settimeout(5.0)  # Add timeout for socket operations
                 server_socket.bind((self.host, self.port))
                 server_socket.listen(5)
                 logger.info(f"Honeypot started on {self.host}:{self.port}")
 
-                while True:
-                    client_socket, client_address = server_socket.accept()
-                    logger.info(f"Connection from {client_address}")
-                    with open(self.log_file, "a") as f:
-                        f.write(f"Connection from {client_address}\n")
-                    client_socket.close()
+                while self.running:
+                    try:
+                        client_socket, client_address = server_socket.accept()
+                        logger.info(f"Connection from {client_address}")
+                        with open(self.log_file, "a") as f:
+                            f.write(f"{datetime.now()} - Connection from {client_address}\n")
+                        client_socket.close()
+                    except socket.timeout:
+                        continue
+                    except Exception as e:
+                        logger.error(f"Connection handling error: {e}")
+                        continue
+
         except Exception as e:
-            logger.error(f"Error in honeypot: {e}")
+            logger.error(f"Honeypot error: {e}")
             raise
+        finally:
+            self.running = False
 
-def start_honeypot():
-    """
-    Start the honeypot in a separate thread.
-    """
-    honeypot = Honeypot()
+    def stop(self):
+        """Gracefully stop the honeypot."""
+        self.running = False
+
+def start_honeypot(port: int = DEFAULT_HONEYPOT_PORT) -> threading.Thread:
+    """Start honeypot in a daemon thread with specified port."""
+    honeypot = Honeypot(port=port)
     honeypot_thread = threading.Thread(target=honeypot.start)
-    honeypot_thread.daemon = True  # Daemonize thread to exit when the main program exits
+    honeypot_thread.daemon = True
     honeypot_thread.start()
+    return honeypot_thread
 
-def scan_network(target: str) -> dict:
-    """
-    Scan a target IP or network using Nmap.
+def validate_ip(target: str) -> bool:
+    """Validate IP address or CIDR range."""
+    parts = target.split('/')
+    if len(parts) == 2:
+        try:
+            prefix = int(parts[1])
+            if not 0 <= prefix <= 32:
+                return False
+        except ValueError:
+            return False
 
-    Args:
-        target: IP address or network range to scan (e.g., "192.168.0.1" or "192.168.0.0/24").
+    octets = parts[0].split('.')
+    if len(octets) != 4:
+        return False
+    
+    try:
+        return all(0 <= int(octet) <= 255 for octet in octets)
+    except ValueError:
+        return False
 
-    Returns:
-        Dictionary containing scan results.
-    """
+def scan_network(target: str, timeout: int = 300) -> dict:
+    """Scan target with timeout and validation."""
+    if not validate_ip(target):
+        raise ValueError(f"Invalid target: {target}")
+
     try:
         nm = nmap.PortScanner()
-        nm.scan(hosts=target, arguments="-sV")  # -sV: Version detection
-        scan_results = nm.analyse_nmap_xml_scan()  # Parse scan results
-        return scan_results
-    except Exception as e:
-        logger.error(f"Error scanning network: {e}")
+        nm.scan(hosts=target, arguments="-sV --max-rtt-timeout 500ms", timeout=timeout)
+        return nm.analyse_nmap_xml_scan()
+    except nmap.PortScannerError as e:
+        logger.error(f"Nmap error: {e}")
         raise
-
-def detect_intrusions(scan_results: dict) -> List[str]:
-    """
-    Analyze scan results to detect potential intrusions.
-
-    Args:
-        scan_results: Dictionary containing Nmap scan results.
-
-    Returns:
-        List of intrusion findings.
-    """
-    findings = []
-
-    for host in scan_results["scan"]:
-        for port, port_data in scan_results["scan"][host]["tcp"].items():
-            if port_data["state"] == "open":
-                finding = f"Open port detected: {host}:{port} ({port_data['name']})"
-                findings.append(finding)
-                logger.info(finding)
-
-    return findings
-
-def save_findings(findings: List[str], file: str = "findings.txt") -> None:
-    """
-    Save intrusion findings to a file.
-
-    Args:
-        findings: List of intrusion findings.
-        file: Path to the output file (default: findings.txt).
-    """
-    try:
-        with open(file, "w") as f:
-            for finding in findings:
-                f.write(f"{finding}\n")
-        logger.info(f"Findings saved to {file}")
     except Exception as e:
-        logger.error(f"Error saving findings: {e}")
+        logger.error(f"Scanning error: {e}")
         raise
 
 class AWSIntrusionDetection:
     def __init__(self, aws_access_key_id: str, aws_secret_access_key: str, region: str = "us-east-1"):
-        """
-        Initialize AWS services for security monitoring.
-
-        Args:
-            aws_access_key_id: AWS Access Key ID.
-            aws_secret_access_key: AWS Secret Access Key.
-            region: AWS region (default: us-east-1).
-        """
+        """Initialize with rate limiting and connection pooling."""
         self.session = boto3.Session(
             aws_access_key_id=aws_access_key_id,
             aws_secret_access_key=aws_secret_access_key,
             region_name=region
         )
+        
+        config = Config(
+            connect_timeout=5,
+            read_timeout=60,
+            retries={'max_attempts': 3},
+            max_pool_connections=50
+        )
+        
         self.services = {
-            "logs": self.session.client("logs"),
-            "securityhub": self.session.client("securityhub"),
-            "kinesis": self.session.client("kinesis"),
-            "lambda": self.session.client("lambda"),
-            "wafv2": self.session.client("wafv2"),
-            "stepfunctions": self.session.client("stepfunctions"),
+            "logs": self.session.client("logs", config=config),
+            "securityhub": self.session.client("securityhub", config=config),
+            "kinesis": self.session.client("kinesis", config=config),
+            "lambda": self.session.client("lambda", config=config),
         }
 
-    def create_kinesis_stream(self, stream_name: str, shard_count: int = 1) -> None:
-        """
-        Create a Kinesis stream if it doesn't already exist.
-
-        Args:
-            stream_name: Name of the Kinesis stream.
-            shard_count: Number of shards for the stream (default: 1).
-        """
-        try:
-            # Check if the stream already exists
-            existing_streams = self.services["kinesis"].list_streams()["StreamNames"]
-            if stream_name not in existing_streams:
-                self.services["kinesis"].create_stream(
-                    StreamName=stream_name,
-                    ShardCount=shard_count
-                )
-                logger.info(f"Created Kinesis stream: {stream_name}")
-            else:
-                logger.info(f"Kinesis stream already exists: {stream_name}")
-        except Exception as e:
-            logger.error(f"Error creating Kinesis stream: {e}")
-            raise
-
     def detect_anomalies(self, logs: List[Dict[str, Any]]) -> pd.Series:
-        """
-        Analyze logs and detect unusual activity using Isolation Forest.
-
-        Args:
-            logs: List of log entries.
-
-        Returns:
-            Series of anomaly predictions (-1 for anomalies, 1 for normal).
-        """
+        """Optimized anomaly detection with feature engineering."""
         try:
             df = pd.DataFrame(logs).fillna({"bytes_sent": 0, "packet_count": 0})
+            
+            # Feature engineering
             df["protocol_encoded"] = LabelEncoder().fit_transform(df["protocol"])
-
-            model = IsolationForest(contamination=0.05, random_state=42)
-            df["anomaly"] = model.fit_predict(df[["bytes_sent", "packet_count", "protocol_encoded"]])
-
+            df["hour"] = pd.to_datetime(df["timestamp"]).dt.hour
+            
+            # Model training with sampling if large dataset
+            sample_size = min(10000, len(df))
+            model = IsolationForest(
+                contamination=0.05,
+                random_state=42,
+                n_estimators=100,
+                max_samples=sample_size
+            )
+            
+            features = ["bytes_sent", "packet_count", "protocol_encoded", "hour"]
+            df["anomaly"] = model.fit_predict(df[features])
+            
             return df["anomaly"]
         except Exception as e:
-            logger.error(f"Error detecting anomalies: {e}")
+            logger.error(f"Anomaly detection failed: {e}")
             raise
 
-    def alert_lambda(self, message: str) -> None:
-        """
-        Trigger AWS Lambda when a threat is detected.
+def main():
+    """Main execution with argument parsing."""
+    parser = argparse.ArgumentParser(description="Cloud Security Monitoring System")
+    parser.add_argument("--port", type=int, default=DEFAULT_HONEYPOT_PORT, help="Honeypot port")
+    parser.add_argument("--target", required=True, help="Network target to scan (e.g., 192.168.1.0/24)")
+    parser.add_argument("--log-file", default="logfile.txt", help="Path to log file")
+    args = parser.parse_args()
 
-        Args:
-            message: Message to send to the Lambda function.
-        """
-        try:
-            self.services["lambda"].invoke(
-                FunctionName=LAMBDA_FUNCTION_NAME,
-                InvocationType="Event",
-                Payload=json.dumps({"message": message}),
-            )
-            logger.info(f"Alert sent to Lambda: {message}")
-        except Exception as e:
-            logger.error(f"Error invoking Lambda: {e}")
-            raise
+    # Get AWS credentials from environment
+    aws_access_key_id = os.getenv("AWS_ACCESS_KEY_ID")
+    aws_secret_access_key = os.getenv("AWS_SECRET_ACCESS_KEY")
+    detector_id = os.getenv("GUARD_DUTY_ID")
+    web_acl_id = os.getenv("WEB_ACL_ID")
 
-    def send_logs_to_kinesis(self, file: str, stream_name: str) -> List[Dict[str, Any]]:
-        """
-        Stream logs to AWS Kinesis in batches and return the logs for anomaly detection.
+    if not all([aws_access_key_id, aws_secret_access_key]):
+        logger.error("AWS credentials not set in environment")
+        return
 
-        Args:
-            file: Path to the log file.
-            stream_name: Name of the Kinesis stream.
+    try:
+        # Start services
+        honeypot_thread = start_honeypot(args.port)
+        logger.info("Started honeypot service")
 
-        Returns:
-            List of log entries.
-        """
-        try:
-            # Check if the file exists
-            if not os.path.exists(file):
-                raise FileNotFoundError(f"Log file not found: {file}")
+        # Initialize AWS system
+        aws_system = AWSIntrusionDetection(aws_access_key_id, aws_secret_access_key)
+        
+        # Run network scan in separate thread
+        def scan_and_analyze():
+            scan_results = scan_network(args.target)
+            findings = detect_intrusions(scan_results)
+            save_findings(findings)
+        
+        scan_thread = threading.Thread(target=scan_and_analyze)
+        scan_thread.start()
 
-            with open(file, "r") as f:
-                logs = [json.loads(log.strip()) for log in f]  # Parse each line as JSON
+        # Main processing
+        aws_system.run(detector_id, web_acl_id, args.log_file)
+        
+        # Wait for threads
+        scan_thread.join()
+        honeypot_thread.join()
 
-            # Send logs to Kinesis
-            for i in range(0, len(logs), KINESIS_BATCH_SIZE):
-                records = [{"Data": json.dumps(log), "PartitionKey": "log"} for log in logs[i : i + KINESIS_BATCH_SIZE]]
-                self.services["kinesis"].put_records(
-                    StreamName=stream_name,
-                    Records=records
-                )
-            logger.info(f"Logs sent to Kinesis stream: {stream_name}")
-
-            return logs  # Return the logs for anomaly detection
-        except FileNotFoundError as e:
-            logger.error(f"Error: {e}")
-            raise
-        except Exception as e:
-            logger.error(f"Error sending logs to Kinesis: {e}")
-            raise
-
-    def run(self, detector_id: str, web_acl_id: str, log_file: str) -> None:
-        """
-        Orchestrate the security pipeline: detect threats, alert, and log activity.
-
-        Args:
-            detector_id: AWS GuardDuty Detector ID.
-            web_acl_id: AWS WAF ACL ID.
-            log_file: Path to the log file.
-        """
-        try:
-            # Validate IDs
-            if not detector_id:
-                raise ValueError("GuardDuty Detector ID is required!")
-            if not web_acl_id:
-                raise ValueError("Web ACL ID is required!")
-
-            # Create the Kinesis stream if it doesn't exist
-            self.create_kinesis_stream(LOG_STREAM_NAME)
-
-            # Send logs to Kinesis and get the logs for anomaly detection
-            logs = self.send_logs_to_kinesis(log_file, LOG_STREAM_NAME)
-
-            # Detect anomalies
-            anomalies = self.detect_anomalies(logs)
-
-            # Log findings to terminal and file
-            for index, log in enumerate(logs):
-                if anomalies[index] == -1:
-                    finding = f"Anomaly detected: {log}"
-                    logger.info(finding)  # Log to terminal and file
-
-            if (anomalies == -1).sum() > 0:
-                self.alert_lambda("Potential security threat detected!")
-
-        except Exception as e:
-            logger.error(f"Error running security pipeline: {e}")
-            raise
+    except KeyboardInterrupt:
+        logger.info("Shutting down gracefully...")
+    except Exception as e:
+        logger.error(f"Fatal error: {e}")
+        return
 
 if __name__ == "__main__":
-    # Start the honeypot
-    start_honeypot()
-
-    # Request user input for AWS credentials
-    aws_access_key_id = input("Enter AWS Access Key ID: ")
-    aws_secret_access_key = input("Enter AWS Secret Access Key: ")
-
-    # Request user input for IDs
-    detector_id = input("Enter GuardDuty Detector ID: ")
-    web_acl_id = input("Enter Web ACL ID: ")
-
-    # Validate input
-    if not aws_access_key_id or not aws_secret_access_key:
-        raise ValueError("AWS Access Key ID and Secret Access Key are required!")
-    if not detector_id or not web_acl_id:
-        raise ValueError("GuardDuty Detector ID and Web ACL ID are required!")
-
-    # Initialize and run the system
-    system = AWSIntrusionDetection(aws_access_key_id, aws_secret_access_key)
-    system.run(detector_id, web_acl_id, "logfile.txt")
-
-    # Scan the network and detect intrusions
-    target = input("Enter the target IP or network range to scan (e.g., 192.168.0.1 or 192.168.0.0/24): ")
-    scan_results = scan_network(target)
-    findings = detect_intrusions(scan_results)
-    save_findings(findings)
+    main()
